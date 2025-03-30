@@ -1,7 +1,15 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import { CliOptions, getCliOptions } from './cli.js'
-import { Branch, getBranches, getRepositories, getSpecificRepository, Repository } from './github.js'
+import {
+  Branch,
+  getBranches,
+  getRepositories,
+  getSpecificRepository,
+  getTopRepos,
+  parseRepoString,
+  Repository,
+} from './github.js'
 
 export const execAsync = promisify(exec)
 
@@ -42,39 +50,34 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
   let processedRepos = 0
 
   try {
+    // Process top repositories by stars if specified
     if (options.topRepos && options.topRepos > 0) {
-      repositories = await getTopRepos(options.topRepos)
-    } else {
-      const organizations = options.orgs.split(',').map(org => org.trim())
+      const topRepos = await getTopRepos(options.topRepos)
+      repositories.push(...topRepos)
+    }
 
-      // Check if zen-browser-flake is in the list of organizations
-      // This handles formats like "org1,MarceColl/zen-browser-flake,org2"
-      const zenBrowserFlakePattern = /([^\/]+)\/zen-browser-flake/
-      const orgsToProcess = []
-
-      for (const org of organizations) {
-        const match = org.match(zenBrowserFlakePattern)
-        if (match) {
-          try {
-            // If it matches the pattern, fetch the specific repository
-            const zenRepo = await getSpecificRepository(match[1], 'zen-browser-flake')
-            repositories.push(zenRepo)
-            console.log(`Added zen-browser-flake repository to the list`)
-          } catch (error) {
-            console.error(`Failed to add zen-browser-flake repository:`, error)
-          }
-        } else {
-          // Regular organization processing
-          orgsToProcess.push(org)
-        }
-      }
-
-      // Process regular organizations
-      for (const org of orgsToProcess) {
-        const orgRepos = await getRepositories(org)
-        repositories.push(...orgRepos)
+    // Process owner organizations/users
+    if (options.owners.length > 0) {
+      for (const owner of options.owners) {
+        const ownerRepos = await getRepositories(owner)
+        repositories.push(...ownerRepos)
       }
     }
+
+    // Process specific repositories
+    if (options.repos.length > 0) {
+      for (const repoString of options.repos) {
+        const { owner, repo } = parseRepoString(repoString)
+        try {
+          const specificRepo = await getSpecificRepository(owner, repo)
+          repositories.push(specificRepo)
+        } catch (error) {
+          console.error(`Failed to add repository ${repoString}:`, error)
+        }
+      }
+    }
+
+    console.log(`Found ${repositories.length} repositories to process`)
 
     for (const repo of repositories) {
       try {
@@ -108,6 +111,7 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
           console.log(
             `\nReached maximum repository limit (${options.maxRepos} of ${repositories.length} total). Stopping search.`,
           )
+          break
         }
       } catch (error) {
         console.error(`Error processing repository ${repo.owner.login}/${repo.name}`)
@@ -129,6 +133,7 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
     throw error
   }
 }
+
 /**
  * Main execution function
  */
@@ -159,7 +164,7 @@ async function main() {
       // Group branches by username
       const userBranches = new Map<string, number>()
       branches.forEach(branch => {
-        const username = branch.username || 'unknown'
+        const username = branch.username || '<no prefix>'
         userBranches.set(username, (userBranches.get(username) || 0) + 1)
       })
 
@@ -170,7 +175,7 @@ async function main() {
       console.log(userStats.join('\n'))
     })
 
-    const repoCountInfo = options.maxRepos && processedRepos >= options.maxRepos
+    const repoCountInfo = options.maxRepos && repositories.length > options.maxRepos
       ? `${repoMap.size} repositories (limited to first ${options.maxRepos} of ${repositories.length} total)`
       : `${repoMap.size} repositories`
     console.log(`\nTotal: ${matchingBranches.length} matching branches in ${repoCountInfo}`)

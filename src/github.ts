@@ -181,6 +181,15 @@ export async function getTopRepos(count: number): Promise<Repository[]> {
 }
 
 /**
+ * Parses a repository string in the format "owner/repo"
+ * Returns an object with owner and repo properties
+ */
+export function parseRepoString(repoString: string): { owner: string; repo: string } {
+  const [owner, repo] = repoString.split('/')
+  return { owner, repo }
+}
+
+/**
  * Fetches branches for a given repository using GitHub API
  */
 export async function getBranches(owner: string, repo: string, maxBranchesToFetch: number = 1000): Promise<Branch[]> {

@@ -3,7 +3,8 @@ import { hideBin } from 'yargs/helpers'
 
 // CLI Options interface
 export interface CliOptions {
-  orgs: string
+  owners: string[]
+  repos: string[]
   topRepos?: number
   maxBranches: number
   maxRepos?: number
@@ -12,14 +13,23 @@ export interface CliOptions {
 // Parse command line arguments
 export const parseArgs = () => {
   return yargs(hideBin(process.argv))
-    .option('orgs', {
+    .option('owner', {
       type: 'string',
-      description: 'Comma-separated list of GitHub organizations to process',
-      default: 'jj-vcs',
+      description: 'GitHub organization or user to process (can be used multiple times)',
+      demandOption: false,
+      array: true,
+      default: [],
+    })
+    .option('repo', {
+      type: 'string',
+      description: 'Specific repository to process in the format "owner/repo" (can be used multiple times)',
+      demandOption: false,
+      array: true,
+      default: [],
     })
     .option('top-repos', {
       type: 'number',
-      description: 'Number of top repositories by stars to process instead of organizations',
+      description: 'Number of top repositories by stars to process',
       demandOption: false,
     })
     .option('max-branches', {
@@ -32,6 +42,23 @@ export const parseArgs = () => {
       description: 'Maximum number of repositories to process',
       demandOption: false,
     })
+    .check((argv) => {
+      // Ensure we have at least one source of repositories
+      if (argv.owner.length === 0 && argv.repo.length === 0 && !argv['top-repos']) {
+        throw new Error('At least one of --owner, --repo, or --top-repos must be specified')
+      }
+
+      // Validate repo format (owner/repo)
+      if (argv.repo && argv.repo.length > 0) {
+        for (const repo of argv.repo as string[]) {
+          if (!repo || !repo.includes('/') || repo.split('/').length !== 2) {
+            throw new Error(`Invalid repository format: "${repo}". Use the format "owner/repo"`)
+          }
+        }
+      }
+
+      return true
+    })
     .help()
     .alias('help', 'h')
     .argv
@@ -41,7 +68,8 @@ export const parseArgs = () => {
 export const getCliOptions = (): CliOptions => {
   const argv = parseArgs()
   return {
-    orgs: argv.orgs as string,
+    owners: argv.owner as string[],
+    repos: argv.repo as string[],
     topRepos: argv['top-repos'] as number | undefined,
     maxBranches: argv['max-branches'] as number,
     maxRepos: argv['max-repos'] as number | undefined,
