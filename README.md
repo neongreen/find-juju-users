@@ -3,10 +3,8 @@
 Finds GitHub repositories with branches matching the pattern "push-".
 It can scan across organizations or top repositories.
 
-Work in progress
-
 ## How to run
 
 ```bash
-pnpm --silent start
+GITHUB_TOKEN=$(gh auth token) pnpm --silent start --owner jj-vcs --repo MarceColl/zen-browser-flake
 ```
