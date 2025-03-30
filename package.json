@@ -1,0 +1,25 @@
+{
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "prestart": "pnpm install --optimistic-repeat-install --silent",
+    "start": "tsx src/index.ts",
+    "check": "tsc --noEmit"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
+  "dependencies": {
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.33",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  },
+  "name": "app",
+  "version": "1.0.0",
+  "description": ""
+}
