@@ -111,27 +111,45 @@ export async function getTopRepos(count: number): Promise<Repository[]> {
     console.log(`Fetching top ${count} repositories by stars...`)
     const octokit = getOctokit()
 
-    const response = await octokit.search.repos({
-      q: 'stars:>1000',
-      sort: 'stars',
-      order: 'desc',
-      per_page: count,
-    })
+    const repositories: Repository[] = []
+    let page = 1
+    const perPage = 100
 
-    const repositories: Repository[] = response.data.items.map(repo => ({
-      name: repo.name,
-      owner: {
-        login: repo.owner.login,
-      },
-      url: repo.html_url,
-      stars: repo.stargazers_count,
-    }))
+    while (repositories.length < count) {
+      const response = await octokit.search.repos({
+        q: 'stars:>1000',
+        sort: 'stars',
+        order: 'desc',
+        per_page: perPage,
+        page,
+      })
+
+      const repos = response.data.items.map(repo => ({
+        name: repo.name,
+        owner: {
+          login: repo.owner.login,
+        },
+        url: repo.html_url,
+        stars: repo.stargazers_count,
+      }))
+
+      repositories.push(...repos)
+
+      if (repos.length < perPage) {
+        // No more results to fetch
+        break
+      }
+
+      page++
+    }
 
     console.log(
-      `Found top ${repositories.length} repositories by stars (out of ${response.data.total_count} total matches)`,
+      `Found top ${repositories.length} repositories by stars (out of ${
+        Math.min(count, repositories.length)
+      } requested)`,
     )
 
-    return repositories
+    return repositories.slice(0, count)
   } catch (error) {
     console.error('Error fetching top repositories:', error)
     if (error instanceof Error) {
