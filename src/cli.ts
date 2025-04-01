@@ -11,6 +11,8 @@ export interface CliOptions {
   includePrs: boolean
   maxPrs: number
   prStatus: 'open' | 'closed' | 'all'
+  forceRefresh: boolean
+  clearCache: boolean
 }
 
 // Parse command line arguments
@@ -18,7 +20,8 @@ export const parseArgs = () => {
   return yargs(hideBin(process.argv))
     .option('owner', {
       type: 'string',
-      description: 'GitHub organization or user to process (can be used multiple times)',
+      description:
+        'GitHub organization or user to process (can be used multiple times, automatically detects if owner is an org or user)',
       demandOption: false,
       array: true,
       default: [],
@@ -61,6 +64,16 @@ export const parseArgs = () => {
       choices: ['open', 'closed', 'all'],
       default: 'all',
     })
+    .option('force-refresh', {
+      type: 'boolean',
+      description: 'Force refreshing data from GitHub, ignoring cache',
+      default: false,
+    })
+    .option('clear-cache', {
+      type: 'boolean',
+      description: 'Clear the cache before running',
+      default: false,
+    })
     .check((argv) => {
       // Ensure we have at least one source of repositories
       if (argv.owner.length === 0 && argv.repo.length === 0 && !argv['top-repos']) {
@@ -95,5 +108,7 @@ export const getCliOptions = (): CliOptions => {
     includePrs: argv['include-prs'] as boolean,
     maxPrs: argv['max-prs'] as number,
     prStatus: argv['pr-status'] as 'open' | 'closed' | 'all',
+    forceRefresh: argv['force-refresh'] as boolean,
+    clearCache: argv['clear-cache'] as boolean,
   }
 }

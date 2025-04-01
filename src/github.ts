@@ -1,5 +1,15 @@
 import { Octokit } from '@octokit/rest'
-import { Repository, UserStats } from './github.js'
+import {
+  cacheBranches,
+  CacheData,
+  cacheOwnerRepositories,
+  cachePullRequests,
+  cacheTopRepositories,
+  isCacheValid,
+  loadCache,
+  saveCache,
+  saveOwnerType,
+} from './cache.js'
 import { execAsync } from './index.js'
 
 export interface Repository {
@@ -50,6 +60,28 @@ interface RepoStats {
 
 // Cache the GitHub token so we only get it once
 let cachedGithubToken: string | null = null
+// Cache instance
+let cacheInstance: CacheData | null = null
+
+/**
+ * Get the cache instance, loading it from disk if needed
+ * @param forceRefresh If true, ignore the existing cache and start fresh
+ */
+export async function getCache(forceRefresh = false): Promise<CacheData> {
+  if (cacheInstance === null || forceRefresh) {
+    cacheInstance = await loadCache(forceRefresh)
+  }
+  return cacheInstance
+}
+
+/**
+ * Commit current cache to disk
+ */
+export async function persistCache(): Promise<void> {
+  if (cacheInstance) {
+    await saveCache(cacheInstance)
+  }
+}
 
 /**
  * Attempt to get a GitHub token from the GitHub CLI
@@ -115,7 +147,21 @@ async function getOctokit(): Promise<Octokit> {
  * @param owner The GitHub owner (organization or user) to check
  * @returns Boolean indicating if the owner is an organization
  */
-async function isOrganization(owner: string): Promise<boolean> {
+export async function isOrganization(owner: string): Promise<boolean> {
+  // Check cache first
+  const cache = await getCache()
+
+  // Look for any repository from this owner to determine owner type
+  const ownerRepos = Object.keys(cache.repositories)
+    .filter(key => key.startsWith(`${owner}/`))
+    .map(key => cache.repositories[key])
+
+  // If we have cached owner information, use it
+  if (ownerRepos.length > 0 && ownerRepos[0].ownerType) {
+    return ownerRepos[0].ownerType === 'organization'
+  }
+
+  // Otherwise make API call
   const octokit = await getOctokit()
 
   try {
@@ -123,11 +169,20 @@ async function isOrganization(owner: string): Promise<boolean> {
     await octokit.orgs.get({
       org: owner,
     })
+
     // If no error is thrown, it's an organization
+    // Update cache
+    cacheInstance = saveOwnerType(cache, owner, true)
+    await persistCache()
+
     return true
   } catch (error) {
     // If we get a 404, it's not an organization, so it's likely a user
     if (error instanceof Error && error.message.includes('Not Found')) {
+      // Update cache
+      cacheInstance = saveOwnerType(cache, owner, false)
+      await persistCache()
+
       return false
     }
     // For any other error, re-throw it
@@ -139,6 +194,18 @@ async function isOrganization(owner: string): Promise<boolean> {
  * Fetches repositories from the owner (organization or user) using GitHub API
  */
 export async function getRepositories(owner: string): Promise<Repository[]> {
+  // Check if we have this in cache
+  const cache = await getCache()
+
+  if (
+    cache.ownerRepos
+    && cache.ownerRepos[owner]
+  ) {
+    console.log(`Using cached repositories for ${owner} (${cache.ownerRepos[owner].data.length} repos)`)
+    return cache.ownerRepos[owner].data
+  }
+
+  // Not in cache or cache expired, fetch from API
   const octokit = await getOctokit()
 
   try {
@@ -174,6 +241,11 @@ export async function getRepositories(owner: string): Promise<Repository[]> {
     }))
 
     console.log(`Found ${repositories.length} repositories for ${owner} ${isOrg ? 'organization' : 'user'}`)
+
+    // Update cache
+    cacheInstance = cacheOwnerRepositories(cache, owner, repositories)
+    await persistCache()
+
     return repositories
   } catch (error) {
     console.error(`Error fetching repositories for ${owner}:`, error)
@@ -188,6 +260,18 @@ export async function getRepositories(owner: string): Promise<Repository[]> {
  * Fetches a specific repository by owner and repo name using GitHub API
  */
 export async function getSpecificRepository(owner: string, repo: string): Promise<Repository> {
+  const cache = await getCache()
+  const repoKey = `${owner}/${repo}`
+
+  // Check if we have this repository in cache
+  if (
+    cache.repositories[repoKey]
+    && cache.repositories[repoKey].data
+  ) {
+    console.log(`Using cached repository data for ${repoKey}`)
+    return cache.repositories[repoKey].data
+  }
+
   try {
     console.log(`Fetching specific repository: ${owner}/${repo}...`)
     const octokit = await getOctokit()
@@ -204,6 +288,17 @@ export async function getSpecificRepository(owner: string, repo: string): Promis
       url: response.data.html_url,
     }
     console.log(`Successfully fetched repository: ${owner}/${repo}`)
+
+    // Update cache
+    if (!cache.repositories[repoKey]) {
+      cache.repositories[repoKey] = {
+        data: repository,
+        processed: false,
+      }
+      cacheInstance = cache
+      await persistCache()
+    }
+
     return repository
   } catch (error) {
     console.error(`Error fetching repository ${owner}/${repo}:`, error)
@@ -215,6 +310,18 @@ export async function getSpecificRepository(owner: string, repo: string): Promis
  * Fetches top N repositories by stars across GitHub
  */
 export async function getTopRepos(count: number): Promise<Repository[]> {
+  const cache = await getCache()
+
+  // Check if we have this in cache with the same count
+  if (
+    cache.topRepos
+    && cache.topRepos.count === count
+    && cache.topRepos.data.length === count
+  ) {
+    console.log(`Using cached top ${count} repositories`)
+    return cache.topRepos.data
+  }
+
   try {
     console.log(`Fetching top ${count} repositories by stars...`)
     const octokit = await getOctokit()
@@ -257,7 +364,13 @@ export async function getTopRepos(count: number): Promise<Repository[]> {
       } requested)`,
     )
 
-    return repositories.slice(0, count)
+    const result = repositories.slice(0, count)
+
+    // Update cache
+    cacheInstance = cacheTopRepositories(cache, count, result)
+    await persistCache()
+
+    return result
   } catch (error) {
     console.error('Error fetching top repositories:', error)
     if (error instanceof Error) {
@@ -280,6 +393,18 @@ export function parseRepoString(repoString: string): { owner: string; repo: stri
  * Fetches branches for a given repository using GitHub API
  */
 export async function getBranches(owner: string, repo: string, maxBranchesToFetch: number = 1000): Promise<Branch[]> {
+  const cache = await getCache()
+  const repoKey = `${owner}/${repo}`
+
+  // Check cache
+  if (
+    cache.repositories[repoKey]
+    && cache.repositories[repoKey].branches
+  ) {
+    console.log(`Using cached branches for ${repoKey} (${cache.repositories[repoKey].branches!.length} branches)`)
+    return cache.repositories[repoKey].branches!
+  }
+
   const octokit = await getOctokit()
 
   try {
@@ -324,7 +449,13 @@ export async function getBranches(owner: string, repo: string, maxBranchesToFetc
     console.log(`Found ${branches.length} branches for ${owner}/${repo}`)
 
     // If we collected more branches than the max, truncate the array
-    return branches.slice(0, maxBranchesToFetch)
+    const result = branches.slice(0, maxBranchesToFetch)
+
+    // Update cache
+    cacheInstance = cacheBranches(cache, owner, repo, result)
+    await persistCache()
+
+    return result
   } catch (error) {
     if (error instanceof Error) {
       const errorMsg = error.message || ''
@@ -347,6 +478,18 @@ export async function getPullRequests(
   maxPrs: number = 100,
   prStatus: 'open' | 'closed' | 'all' = 'all',
 ): Promise<PullRequest[]> {
+  const cache = await getCache()
+  const repoKey = `${owner}/${repo}`
+
+  // Check cache
+  if (
+    cache.repositories[repoKey]
+    && cache.repositories[repoKey].pullRequests
+  ) {
+    console.log(`Using cached pull requests for ${repoKey} (${cache.repositories[repoKey].pullRequests!.length} PRs)`)
+    return cache.repositories[repoKey].pullRequests!
+  }
+
   const octokit = await getOctokit()
 
   try {
@@ -403,7 +546,13 @@ export async function getPullRequests(
     console.log(`Found ${pullRequests.length} pull requests for ${owner}/${repo}`)
 
     // If we collected more PRs than the max, truncate the array
-    return pullRequests.slice(0, maxPrs)
+    const result = pullRequests.slice(0, maxPrs)
+
+    // Update cache
+    cacheInstance = cachePullRequests(cache, owner, repo, result)
+    await persistCache()
+
+    return result
   } catch (error) {
     if (error instanceof Error) {
       const errorMsg = error.message || ''
