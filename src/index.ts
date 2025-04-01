@@ -157,7 +157,7 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
           repo.owner.login,
           repo.name,
           options.maxPrs,
-          options.prStatus
+          options.prStatus,
         )
 
         let matchFound = false
@@ -181,14 +181,18 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
         processedRepos++
         if (!matchFound) {
           const repoLimitInfo = options.maxRepos
-            ? `${processedRepos}/${Math.min(options.maxRepos, repositories.length)} (limit: ${options.maxRepos} of ${repositories.length} total)`
+            ? `${processedRepos}/${
+              Math.min(options.maxRepos, repositories.length)
+            } (limit: ${options.maxRepos} of ${repositories.length} total)`
             : `${processedRepos}/${repositories.length}`
           process.stdout.write(`\rProcessed PR search in ${repoLimitInfo} repositories...`)
         }
 
         // Check if we've reached the maxRepos limit
         if (options.maxRepos && processedRepos >= options.maxRepos) {
-          console.log(`\nReached maximum repository limit (${options.maxRepos} of ${repositories.length} total). Stopping PR search.`)
+          console.log(
+            `\nReached maximum repository limit (${options.maxRepos} of ${repositories.length} total). Stopping PR search.`,
+          )
           break
         }
       } catch (error) {
@@ -197,7 +201,9 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
 
         // Also check after processing a repo with error
         if (options.maxRepos && processedRepos >= options.maxRepos) {
-          console.log(`\nReached maximum repository limit (${options.maxRepos} of ${repositories.length} total). Stopping PR search.`)
+          console.log(
+            `\nReached maximum repository limit (${options.maxRepos} of ${repositories.length} total). Stopping PR search.`,
+          )
           break
         }
       }
@@ -219,7 +225,7 @@ async function main() {
 
     // Gather repositories first as we'll need them for both branches and PRs
     let repositories: Repository[] = []
-    
+
     // Process top repositories by stars if specified
     if (options.topRepos && options.topRepos > 0) {
       const topRepos = await getTopRepos(options.topRepos)
@@ -340,15 +346,17 @@ async function main() {
         : `${prRepoMap.size} repositories`
       console.log(`\nTotal: ${matchingPRs.length} matching pull requests in ${prRepoCountInfo}`)
     }
-
   } catch (error) {
     console.error('Failed to complete search:', error)
     process.exit(1)
   }
 }
 
-// Execute the main function
-main().catch(error => {
-  console.error('Unhandled error:', error)
-  process.exit(1)
-})
+// Only run the main function when this file is executed directly (not imported)
+// This check is to avoid running the main function during tests
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(error => {
+    console.error('Unhandled error:', error)
+    process.exit(1)
+  })
+}

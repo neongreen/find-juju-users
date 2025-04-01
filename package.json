@@ -4,7 +4,9 @@
   "scripts": {
     "prestart": "pnpm install --optimistic-repeat-install --silent",
     "start": "tsx src/index.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -12,13 +14,14 @@
     ]
   },
   "dependencies": {
-    "yargs": "^17.7.2",
-    "@octokit/rest": "^19.0.13"
+    "@octokit/rest": "^19.0.13",
+    "yargs": "^17.7.2"
   },
   "devDependencies": {
     "@types/yargs": "^17.0.33",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1"
   },
   "name": "app",
   "version": "1.0.0",
