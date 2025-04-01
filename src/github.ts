@@ -24,6 +24,24 @@ export interface UserStats {
   count: number
 }
 
+export interface PullRequest {
+  number: number
+  title: string
+  status: 'open' | 'closed'
+  created_at: string
+  head: {
+    ref: string  // The name of the branch the PR is from
+    label: string
+  }
+  base: {
+    ref: string  // The name of the branch the PR is targeting
+  }
+  user: {
+    login: string
+  }
+  html_url: string
+}
+
 interface RepoStats {
   repository: string
   totalBranches: number
@@ -224,6 +242,84 @@ export async function getBranches(owner: string, repo: string, maxBranchesToFetc
         console.error(`GitHub API rate limit exceeded while fetching branches for ${owner}/${repo}`)
       } else {
         console.error(`Error fetching branches for ${owner}/${repo}:`, error)
+      }
+    }
+    return []
+  }
+}
+
+/**
+ * Fetches pull requests for a given repository using GitHub API
+ */
+export async function getPullRequests(
+  owner: string,
+  repo: string,
+  maxPrs: number = 100,
+  prStatus: 'open' | 'closed' | 'all' = 'all'
+): Promise<PullRequest[]> {
+  const octokit = getOctokit()
+
+  try {
+    console.log(`Fetching pull requests for ${owner}/${repo}...`)
+
+    const pullRequests = await octokit.paginate(
+      octokit.pulls.list,
+      {
+        owner,
+        repo,
+        state: prStatus,
+        sort: 'created',  // Sort by creation date
+        direction: 'desc', // Newest first
+        per_page: 100,
+      },
+      response => response.data.map(pr => ({
+        number: pr.number,
+        title: pr.title,
+        status: pr.state as 'open' | 'closed',
+        created_at: pr.created_at,
+        head: {
+          ref: pr.head.ref,
+          label: pr.head.label,
+        },
+        base: {
+          ref: pr.base.ref,
+        },
+        user: {
+          login: pr.user?.login || 'unknown',
+        },
+        html_url: pr.html_url,
+      })),
+      {
+        throttle: {
+          onRateLimit: (retryAfter, options) => {
+            console.warn(`Rate limit hit while fetching PRs. Retrying after ${retryAfter} seconds`)
+            return true // retry
+          },
+          onSecondaryRateLimit: (retryAfter, options) => {
+            console.warn(`Secondary rate limit hit while fetching PRs. Retrying after ${retryAfter} seconds`)
+            return true // retry
+          },
+        },
+        // Stop once we've collected enough PRs
+        pageOptions: {
+          request: {
+            pageLimit: Math.ceil(maxPrs / 100),
+          },
+        },
+      },
+    )
+
+    console.log(`Found ${pullRequests.length} pull requests for ${owner}/${repo}`)
+
+    // If we collected more PRs than the max, truncate the array
+    return pullRequests.slice(0, maxPrs)
+  } catch (error) {
+    if (error instanceof Error) {
+      const errorMsg = error.message || ''
+      if (errorMsg.includes('rate limit') || errorMsg.includes('API rate limit exceeded')) {
+        console.error(`GitHub API rate limit exceeded while fetching PRs for ${owner}/${repo}`)
+      } else {
+        console.error(`Error fetching PRs for ${owner}/${repo}:`, error)
       }
     }
     return []

@@ -8,6 +8,9 @@ export interface CliOptions {
   topRepos?: number
   maxBranches: number
   maxRepos?: number
+  includePrs: boolean
+  maxPrs: number
+  prStatus: 'open' | 'closed' | 'all'
 }
 
 // Parse command line arguments
@@ -42,6 +45,22 @@ export const parseArgs = () => {
       description: 'Maximum number of repositories to process',
       demandOption: false,
     })
+    .option('include-prs', {
+      type: 'boolean',
+      description: 'Include pull requests in the search',
+      default: false,
+    })
+    .option('max-prs', {
+      type: 'number',
+      description: 'Maximum number of pull requests to fetch per repository',
+      default: 100,
+    })
+    .option('pr-status', {
+      type: 'string',
+      description: 'Status of pull requests to include (open, closed, or all)',
+      choices: ['open', 'closed', 'all'],
+      default: 'all',
+    })
     .check((argv) => {
       // Ensure we have at least one source of repositories
       if (argv.owner.length === 0 && argv.repo.length === 0 && !argv['top-repos']) {
@@ -73,5 +92,8 @@ export const getCliOptions = (): CliOptions => {
     topRepos: argv['top-repos'] as number | undefined,
     maxBranches: argv['max-branches'] as number,
     maxRepos: argv['max-repos'] as number | undefined,
+    includePrs: argv['include-prs'] as boolean,
+    maxPrs: argv['max-prs'] as number,
+    prStatus: argv['pr-status'] as 'open' | 'closed' | 'all',
   }
 }
