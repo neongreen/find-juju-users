@@ -19,7 +19,8 @@ export interface CacheData {
       branchesTimestamp?: number
       pullRequests?: PullRequest[]
       pullRequestsTimestamp?: number
-      processed: boolean // track whether we've processed this repository
+      branchesProcessed: boolean // track whether we've processed branches for this repository
+      prsProcessed: boolean // track whether we've processed PRs for this repository
     }
   }
   topRepos?: {
@@ -131,7 +132,8 @@ export const cacheOwnerRepositories = (
     newCache.repositories[repoKey] = {
       ...newCache.repositories[repoKey],
       data: repo,
-      processed: false,
+      branchesProcessed: false,
+      prsProcessed: false,
     }
   })
 
@@ -158,7 +160,8 @@ export const cacheTopRepositories = (
     newCache.repositories[repoKey] = {
       ...newCache.repositories[repoKey],
       data: repo,
-      processed: false,
+      branchesProcessed: false,
+      prsProcessed: false,
     }
   })
 
@@ -178,7 +181,8 @@ export const cacheBranches = (
   if (!newCache.repositories[repoKey]) {
     newCache.repositories[repoKey] = {
       data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` },
-      processed: false,
+      branchesProcessed: false,
+      prsProcessed: false,
     }
   }
 
@@ -201,7 +205,8 @@ export const cachePullRequests = (
   if (!newCache.repositories[repoKey]) {
     newCache.repositories[repoKey] = {
       data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` },
-      processed: false,
+      branchesProcessed: false,
+      prsProcessed: false,
     }
   }
 
@@ -211,8 +216,8 @@ export const cachePullRequests = (
   return newCache
 }
 
-// Mark a repository as processed
-export const markRepositoryProcessed = (
+// Mark a repository as having its branches processed
+export const markRepositoryBranchesProcessed = (
   cache: CacheData,
   owner: string,
   repo: string,
@@ -224,7 +229,24 @@ export const markRepositoryProcessed = (
     return newCache
   }
 
-  newCache.repositories[repoKey].processed = true
+  newCache.repositories[repoKey].branchesProcessed = true
+  return newCache
+}
+
+// Mark a repository as having its PRs processed
+export const markRepositoryPRsProcessed = (
+  cache: CacheData,
+  owner: string,
+  repo: string,
+): CacheData => {
+  const newCache = { ...cache }
+  const repoKey = `${owner}/${repo}`
+
+  if (!newCache.repositories[repoKey]) {
+    return newCache
+  }
+
+  newCache.repositories[repoKey].prsProcessed = true
   return newCache
 }
 

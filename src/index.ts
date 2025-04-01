@@ -1,6 +1,6 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { clearCache, markRepositoryProcessed, updateCliOptions } from './cache.js'
+import { clearCache, markRepositoryBranchesProcessed, markRepositoryPRsProcessed, updateCliOptions } from './cache.js'
 import { CliOptions, getCliOptions } from './cli.js'
 import {
   Branch,
@@ -117,10 +117,10 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
       }
     }
 
-    // Now filter repositories that aren't processed yet, so we only fetch data for these
+    // Now filter repositories that don't have branches processed yet, so we only fetch branch data for these
     const unprocessedRepos = repositories.filter(repo => {
       const repoKey = `${repo.owner.login}/${repo.name}`
-      return !cache.repositories[repoKey]?.processed
+      return !cache.repositories[repoKey]?.branchesProcessed
     })
 
     if (unprocessedRepos.length < repositories.length) {
@@ -161,8 +161,8 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
           process.stdout.write(`\rProcessed ${repoLimitInfo} repositories...`)
         }
 
-        // Mark repository as processed in cache
-        cache = markRepositoryProcessed(cache, repo.owner.login, repo.name)
+        // Mark repository as having its branches processed in cache
+        cache = markRepositoryBranchesProcessed(cache, repo.owner.login, repo.name)
 
         // Save cache every 5 repositories to allow for resumption
         if (processedRepos % 5 === 0) {
@@ -180,8 +180,8 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
         console.error(`Error processing repository ${repo.owner.login}/${repo.name}`)
         processedRepos++
 
-        // Even if processing failed, mark as processed to prevent re-processing on resume
-        cache = markRepositoryProcessed(cache, repo.owner.login, repo.name)
+        // Even if processing failed, mark as having branches processed to prevent re-processing on resume
+        cache = markRepositoryBranchesProcessed(cache, repo.owner.login, repo.name)
 
         // Save cache periodically
         if (processedRepos % 5 === 0) {
@@ -242,10 +242,10 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
       }
     }
 
-    // Filter out repositories that have already been processed
+    // Filter out repositories that already have PRs processed
     const unprocessedRepos = repositories.filter(repo => {
       const repoKey = `${repo.owner.login}/${repo.name}`
-      return !cache.repositories[repoKey]?.processed
+      return !cache.repositories[repoKey]?.prsProcessed
     })
 
     if (unprocessedRepos.length < repositories.length) {
@@ -296,8 +296,8 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
           process.stdout.write(`\rProcessed PR search in ${repoLimitInfo} repositories...`)
         }
 
-        // Mark this repository as processed for PRs in the cache
-        cache = markRepositoryProcessed(cache, repo.owner.login, repo.name)
+        // Mark this repository as having its PRs processed in the cache
+        cache = markRepositoryPRsProcessed(cache, repo.owner.login, repo.name)
 
         // Save cache every 5 repositories to allow for resumption
         if (processedRepos % 5 === 0) {
@@ -315,8 +315,8 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
         console.error(`Error processing pull requests for repository ${repo.owner.login}/${repo.name}`)
         processedRepos++
 
-        // Even on error, mark as processed to avoid retries
-        cache = markRepositoryProcessed(cache, repo.owner.login, repo.name)
+        // Even on error, mark as having PRs processed to avoid retries
+        cache = markRepositoryPRsProcessed(cache, repo.owner.login, repo.name)
 
         // Save cache periodically
         if (processedRepos % 5 === 0) {
