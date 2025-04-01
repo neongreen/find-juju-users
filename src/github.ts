@@ -111,20 +111,59 @@ async function getOctokit(): Promise<Octokit> {
 }
 
 /**
- * Fetches repositories from the organization using GitHub API
+ * Checks if the provided owner is an organization or a user
+ * @param owner The GitHub owner (organization or user) to check
+ * @returns Boolean indicating if the owner is an organization
  */
-export async function getRepositories(organization: string): Promise<Repository[]> {
+async function isOrganization(owner: string): Promise<boolean> {
   const octokit = await getOctokit()
 
   try {
-    console.log(`Fetching repositories from ${organization} organization...`)
-
-    // Use Octokit's automatic pagination to get all repositories at once
-    const repos = await octokit.paginate(octokit.repos.listForOrg, {
-      org: organization,
-      per_page: 100,
-      sort: 'full_name',
+    // Try to get the organization profile
+    await octokit.orgs.get({
+      org: owner,
     })
+    // If no error is thrown, it's an organization
+    return true
+  } catch (error) {
+    // If we get a 404, it's not an organization, so it's likely a user
+    if (error instanceof Error && error.message.includes('Not Found')) {
+      return false
+    }
+    // For any other error, re-throw it
+    throw error
+  }
+}
+
+/**
+ * Fetches repositories from the owner (organization or user) using GitHub API
+ */
+export async function getRepositories(owner: string): Promise<Repository[]> {
+  const octokit = await getOctokit()
+
+  try {
+    // Check if the owner is an organization or a user
+    const isOrg = await isOrganization(owner)
+
+    console.log(`Fetching repositories from ${owner} ${isOrg ? 'organization' : 'user'}...`)
+
+    let repos
+
+    if (isOrg) {
+      // Use Octokit's automatic pagination to get all repositories from an organization
+      repos = await octokit.paginate(octokit.repos.listForOrg, {
+        org: owner,
+        per_page: 100,
+        sort: 'full_name',
+      })
+    } else {
+      // Use Octokit's automatic pagination to get all repositories from a user
+      repos = await octokit.paginate(octokit.repos.listForUser, {
+        username: owner,
+        per_page: 100,
+        sort: 'full_name',
+      })
+    }
 
     const repositories: Repository[] = repos.map(repo => ({
       name: repo.name,
@@ -134,14 +173,14 @@ export async function getRepositories(organization: string): Promise<Repository[
       url: repo.html_url,
     }))
 
-    console.log(`Found ${repositories.length} repositories in the ${organization} organization`)
+    console.log(`Found ${repositories.length} repositories for ${owner} ${isOrg ? 'organization' : 'user'}`)
     return repositories
   } catch (error) {
-    console.error(`Error fetching repositories for ${organization}:`, error)
+    console.error(`Error fetching repositories for ${owner}:`, error)
     if (error instanceof Error) {
       console.error('Error details:', error.message)
     }
-    throw new Error(`Failed to fetch repositories for ${organization}`)
+    throw new Error(`Failed to fetch repositories for ${owner}`)
   }
 }
 
