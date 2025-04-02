@@ -13,7 +13,7 @@ pnpm --silent start --owner jj-vcs --repo MarceColl/zen-browser-flake
 pnpm --silent start --owner jj-vcs --include-prs
 
 # Customize pull request search
-pnpm --silent start --owner jj-vcs --include-prs --pr-status open --max-prs 50
+pnpm --silent start --owner jj-vcs --include-prs --pr-status open
 ```
 
 ## Options
@@ -24,16 +24,14 @@ pnpm --silent start --owner jj-vcs --include-prs --pr-status open --max-prs 50
 - `--repo`: Specific repository to process in format "owner/repo" (can be used multiple times)
 - `--top-repos`: Number of top repositories by stars to process
 
-### Branch Search Options
+### Search Limitation Options
 
-- `--max-branches`: Maximum number of branches to fetch per repository (default: 1000)
 - `--max-repos`: Maximum number of repositories to process in total
 
 ### Pull Request Options
 
 - `--include-prs`: Include pull requests in the search (default: false)
 - `--pr-status`: Status of pull requests to include: 'open', 'closed', or 'all' (default: 'all')
-- `--max-prs`: Maximum number of pull requests to fetch per repository (default: 100)
 
 ### Caching and Resume Options
 

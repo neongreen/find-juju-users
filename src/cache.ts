@@ -19,8 +19,6 @@ export interface CacheData {
       branchesTimestamp?: number
       pullRequests?: PullRequest[]
       pullRequestsTimestamp?: number
-      branchesProcessed: boolean // track whether we've processed branches for this repository
-      prsProcessed: boolean // track whether we've processed PRs for this repository
     }
   }
   topRepos?: {
@@ -42,9 +40,7 @@ export const initializeCache = (): CacheData => {
     cliOptions: {
       owners: [],
       repos: [],
-      maxBranches: 1000,
       includePrs: false,
-      maxPrs: 100,
       prStatus: 'all',
     },
     timestamp: Date.now(),
@@ -131,9 +127,7 @@ export const cacheOwnerRepositories = (
     const repoKey = `${repo.owner.login}/${repo.name}`
     newCache.repositories[repoKey] = {
       ...newCache.repositories[repoKey],
-      data: repo,
-      branchesProcessed: false,
-      prsProcessed: false,
+      data: repo
     }
   })
 
@@ -159,9 +153,7 @@ export const cacheTopRepositories = (
     const repoKey = `${repo.owner.login}/${repo.name}`
     newCache.repositories[repoKey] = {
       ...newCache.repositories[repoKey],
-      data: repo,
-      branchesProcessed: false,
-      prsProcessed: false,
+      data: repo
     }
   })
 
@@ -180,9 +172,7 @@ export const cacheBranches = (
 
   if (!newCache.repositories[repoKey]) {
     newCache.repositories[repoKey] = {
-      data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` },
-      branchesProcessed: false,
-      prsProcessed: false,
+      data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` }
     }
   }
 
@@ -204,9 +194,7 @@ export const cachePullRequests = (
 
   if (!newCache.repositories[repoKey]) {
     newCache.repositories[repoKey] = {
-      data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` },
-      branchesProcessed: false,
-      prsProcessed: false,
+      data: { name: repo, owner: { login: owner }, url: `https://github.com/${owner}/${repo}` }
     }
   }
 
@@ -216,39 +204,6 @@ export const cachePullRequests = (
   return newCache
 }
 
-// Mark a repository as having its branches processed
-export const markRepositoryBranchesProcessed = (
-  cache: CacheData,
-  owner: string,
-  repo: string,
-): CacheData => {
-  const newCache = { ...cache }
-  const repoKey = `${owner}/${repo}`
-
-  if (!newCache.repositories[repoKey]) {
-    return newCache
-  }
-
-  newCache.repositories[repoKey].branchesProcessed = true
-  return newCache
-}
-
-// Mark a repository as having its PRs processed
-export const markRepositoryPRsProcessed = (
-  cache: CacheData,
-  owner: string,
-  repo: string,
-): CacheData => {
-  const newCache = { ...cache }
-  const repoKey = `${owner}/${repo}`
-
-  if (!newCache.repositories[repoKey]) {
-    return newCache
-  }
-
-  newCache.repositories[repoKey].prsProcessed = true
-  return newCache
-}
 
 // Save the owner type (organization or user)
 export const saveOwnerType = (

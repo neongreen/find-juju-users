@@ -6,10 +6,8 @@ export interface CliOptions {
   owners: string[]
   repos: string[]
   topRepos?: number
-  maxBranches: number
   maxRepos?: number
   includePrs: boolean
-  maxPrs: number
   prStatus: 'open' | 'closed' | 'all'
   forceRefresh: boolean
   clearCache: boolean
@@ -38,11 +36,6 @@ export const parseArgs = () => {
       description: 'Number of top repositories by stars to process',
       demandOption: false,
     })
-    .option('max-branches', {
-      type: 'number',
-      description: 'Maximum number of branches to fetch per repository',
-      default: 1000,
-    })
     .option('max-repos', {
       type: 'number',
       description: 'Maximum number of repositories to process',
@@ -52,11 +45,6 @@ export const parseArgs = () => {
       type: 'boolean',
       description: 'Include pull requests in the search',
       default: false,
-    })
-    .option('max-prs', {
-      type: 'number',
-      description: 'Maximum number of pull requests to fetch per repository',
-      default: 100,
     })
     .option('pr-status', {
       type: 'string',
@@ -103,10 +91,8 @@ export const getCliOptions = (): CliOptions => {
     owners: argv.owner as string[],
     repos: argv.repo as string[],
     topRepos: argv['top-repos'] as number | undefined,
-    maxBranches: argv['max-branches'] as number,
     maxRepos: argv['max-repos'] as number | undefined,
     includePrs: argv['include-prs'] as boolean,
-    maxPrs: argv['max-prs'] as number,
     prStatus: argv['pr-status'] as 'open' | 'closed' | 'all',
     forceRefresh: argv['force-refresh'] as boolean,
     clearCache: argv['clear-cache'] as boolean,

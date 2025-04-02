@@ -47,7 +47,7 @@ npm start -- --orgs org1,org2
 npm start -- --top-repos 100
 
 # Scan with branch and repository limits
-npm start -- --orgs org1,org2 --max-branches 500 --max-repos 50
+npm start -- --orgs org1,org2
 
 # Scan the zen-browser-flake repository
 npm start -- --orgs MarceColl/zen-browser-flake
@@ -61,9 +61,7 @@ npm start
 - `--orgs`: Comma-separated list of organization names to scan (can include specific repositories in format `owner/zen-browser-flake`)
 - `--top-repos`: Number of top repositories to scan
 - `--max-branches`: Maximum number of branches to scan per repository (default: 1000)
-- `--max-repos`: Maximum number of repositories to scan in total (optional)
-
-If no options are specified, the tool will default to scanning the authenticated user's accessible repositories.
+  If no options are specified, the tool will default to scanning the authenticated user's accessible repositories.
 
 ## Testing
 

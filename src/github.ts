@@ -292,8 +292,7 @@ export async function getSpecificRepository(owner: string, repo: string): Promis
     // Update cache
     if (!cache.repositories[repoKey]) {
       cache.repositories[repoKey] = {
-        data: repository,
-        processed: false,
+        data: repository
       }
       cacheInstance = cache
       await persistCache()
@@ -392,7 +391,7 @@ export function parseRepoString(repoString: string): { owner: string; repo: stri
 /**
  * Fetches branches for a given repository using GitHub API
  */
-export async function getBranches(owner: string, repo: string, maxBranchesToFetch: number = 1000): Promise<Branch[]> {
+export async function getBranches(owner: string, repo: string): Promise<Branch[]> {
   const cache = await getCache()
   const repoKey = `${owner}/${repo}`
 
@@ -437,19 +436,12 @@ export async function getBranches(owner: string, repo: string, maxBranchesToFetc
             return true // retry
           },
         },
-        // Stop once we've collected enough branches
-        pageOptions: {
-          request: {
-            pageLimit: Math.ceil(maxBranchesToFetch / 100),
           },
-        },
-      },
     )
 
     console.log(`Found ${branches.length} branches for ${owner}/${repo}`)
 
-    // If we collected more branches than the max, truncate the array
-    const result = branches.slice(0, maxBranchesToFetch)
+    const result = branches
 
     // Update cache
     cacheInstance = cacheBranches(cache, owner, repo, result)
@@ -475,7 +467,6 @@ export async function getBranches(owner: string, repo: string, maxBranchesToFetc
 export async function getPullRequests(
   owner: string,
   repo: string,
-  maxPrs: number = 100,
   prStatus: 'open' | 'closed' | 'all' = 'all',
 ): Promise<PullRequest[]> {
   const cache = await getCache()
@@ -534,19 +525,12 @@ export async function getPullRequests(
             return true // retry
           },
         },
-        // Stop once we've collected enough PRs
-        pageOptions: {
-          request: {
-            pageLimit: Math.ceil(maxPrs / 100),
-          },
-        },
       },
     )
 
     console.log(`Found ${pullRequests.length} pull requests for ${owner}/${repo}`)
 
-    // If we collected more PRs than the max, truncate the array
-    const result = pullRequests.slice(0, maxPrs)
+    const result = pullRequests
 
     // Update cache
     cacheInstance = cachePullRequests(cache, owner, repo, result)

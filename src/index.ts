@@ -1,6 +1,6 @@
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { clearCache, markRepositoryBranchesProcessed, markRepositoryPRsProcessed, updateCliOptions } from './cache.js'
+import { clearCache, updateCliOptions } from './cache.js'
 import { CliOptions, getCliOptions } from './cli.js'
 import {
   Branch,
@@ -117,26 +117,24 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
       }
     }
 
-    // Now filter repositories that don't have branches processed yet, so we only fetch branch data for these
-    const unprocessedRepos = repositories.filter(repo => {
+    // Filter repositories where we need to fetch branches
+    const reposToFetch = repositories.filter(repo => {
       const repoKey = `${repo.owner.login}/${repo.name}`
-      return !cache.repositories[repoKey]?.branchesProcessed
+      return !cache.repositories[repoKey]?.branches
     })
 
-    if (unprocessedRepos.length < repositories.length) {
+    if (reposToFetch.length < repositories.length) {
       console.log(
-        `Resuming search: ${
-          repositories.length - unprocessedRepos.length
-        } repositories already processed, ${unprocessedRepos.length} remaining.`,
+        `Using cached branches for ${repositories.length - reposToFetch.length} repositories, fetching for ${reposToFetch.length} repositories.`,
       )
-      processedRepos = repositories.length - unprocessedRepos.length
+      processedRepos = repositories.length - reposToFetch.length
     } else {
-      console.log(`Starting search on ${repositories.length} repositories.`)
+      console.log(`Starting branch search on ${repositories.length} repositories.`)
     }
 
-    for (const repo of unprocessedRepos) {
+    for (const repo of reposToFetch) {
       try {
-        const branches = await getBranches(repo.owner.login, repo.name, options.maxBranches)
+        const branches = await getBranches(repo.owner.login, repo.name)
         let matchFound = false
 
         for (const branch of branches) {
@@ -161,13 +159,8 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
           process.stdout.write(`\rProcessed ${repoLimitInfo} repositories...`)
         }
 
-        // Mark repository as having its branches processed in cache
-        cache = markRepositoryBranchesProcessed(cache, repo.owner.login, repo.name)
-
-        // Save cache every 5 repositories to allow for resumption
-        if (processedRepos % 5 === 0) {
-          await persistCache()
-        }
+        // Save cache after fetching branches
+        await persistCache()
 
         // Check if we've reached the maxRepos limit
         if (options.maxRepos && processedRepos >= options.maxRepos) {
@@ -180,13 +173,8 @@ async function findMatchingBranches(options: CliOptions): Promise<BranchMatch[]>
         console.error(`Error processing repository ${repo.owner.login}/${repo.name}`)
         processedRepos++
 
-        // Even if processing failed, mark as having branches processed to prevent re-processing on resume
-        cache = markRepositoryBranchesProcessed(cache, repo.owner.login, repo.name)
-
-        // Save cache periodically
-        if (processedRepos % 5 === 0) {
-          await persistCache()
-        }
+        // Save cache even if processing failed
+        await persistCache()
 
         // Also check after processing a repo with error
         if (options.maxRepos && processedRepos >= options.maxRepos) {
@@ -242,29 +230,26 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
       }
     }
 
-    // Filter out repositories that already have PRs processed
-    const unprocessedRepos = repositories.filter(repo => {
+    // Filter repositories where we need to fetch PRs
+    const reposToFetch = repositories.filter(repo => {
       const repoKey = `${repo.owner.login}/${repo.name}`
-      return !cache.repositories[repoKey]?.prsProcessed
+      return !cache.repositories[repoKey]?.pullRequests
     })
 
-    if (unprocessedRepos.length < repositories.length) {
+    if (reposToFetch.length < repositories.length) {
       console.log(
-        `Resuming PR search: ${
-          repositories.length - unprocessedRepos.length
-        } repositories already processed, ${unprocessedRepos.length} remaining.`,
+        `Using cached PRs for ${repositories.length - reposToFetch.length} repositories, fetching for ${reposToFetch.length} repositories.`,
       )
-      processedRepos = repositories.length - unprocessedRepos.length
+      processedRepos = repositories.length - reposToFetch.length
     } else {
       console.log(`Starting PR search on ${repositories.length} repositories.`)
     }
 
-    for (const repo of unprocessedRepos) {
+    for (const repo of reposToFetch) {
       try {
         const pullRequests = await getPullRequests(
           repo.owner.login,
           repo.name,
-          options.maxPrs,
           options.prStatus,
         )
 
@@ -296,13 +281,8 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
           process.stdout.write(`\rProcessed PR search in ${repoLimitInfo} repositories...`)
         }
 
-        // Mark this repository as having its PRs processed in the cache
-        cache = markRepositoryPRsProcessed(cache, repo.owner.login, repo.name)
-
-        // Save cache every 5 repositories to allow for resumption
-        if (processedRepos % 5 === 0) {
-          await persistCache()
-        }
+        // Save cache after fetching PRs
+        await persistCache()
 
         // Check if we've reached the maxRepos limit
         if (options.maxRepos && processedRepos >= options.maxRepos) {
@@ -315,13 +295,8 @@ async function findMatchingPullRequests(options: CliOptions, repositories: Repos
         console.error(`Error processing pull requests for repository ${repo.owner.login}/${repo.name}`)
         processedRepos++
 
-        // Even on error, mark as having PRs processed to avoid retries
-        cache = markRepositoryPRsProcessed(cache, repo.owner.login, repo.name)
-
-        // Save cache periodically
-        if (processedRepos % 5 === 0) {
-          await persistCache()
-        }
+        // Save cache even if PR processing failed
+        await persistCache()
 
         // Also check after processing a repo with error
         if (options.maxRepos && processedRepos >= options.maxRepos) {
