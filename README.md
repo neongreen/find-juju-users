@@ -38,9 +38,17 @@ pnpm --silent start --owner jj-vcs --include-prs --pr-status open
 - `--force-refresh`: Force refreshing data from GitHub, ignoring cache (default: false)
 - `--clear-cache`: Clear the cache completely before running (default: false)
 
+## Output Format
+
+The tool outputs:
+- Repositories with matching branches, grouped by repository
+- For each repository, branches are counted by username
+- When including PRs with `--include-prs`, repositories with matching pull requests are shown
+- Pull requests are counted by user for each repository
+
 ## Resumable Execution
 
-The tool now supports resumable execution by caching API results and tracking progress.
+The tool supports resumable execution by caching API results and tracking progress.
 If your search is interrupted (e.g., due to CTRL+C or connection issues), you can simply
 restart the tool with the same parameters and it will pick up where it left off, using
 cached data when possible.

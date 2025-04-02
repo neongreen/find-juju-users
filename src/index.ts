@@ -444,25 +444,16 @@ async function main() {
         console.log(`\n${repository}: ${prs.length} matching pull requests`)
 
         // Group PRs by username
-        const userPRs = new Map<string, PullRequestMatch[]>()
+        const userPRs = new Map<string, number>()
         prs.forEach(pr => {
-          if (!userPRs.has(pr.username)) {
-            userPRs.set(pr.username, [])
-          }
-          userPRs.get(pr.username)!.push(pr)
+          userPRs.set(pr.username, (userPRs.get(pr.username) || 0) + 1)
         })
 
-        // Display PR statistics by user
-        Array.from(userPRs.entries())
-          .sort(([, a], [, b]) => b.length - a.length)
-          .forEach(([username, userPRs]) => {
-            console.log(`\n  ${username}: ${userPRs.length} PR${userPRs.length > 1 ? 's' : ''}`)
-            userPRs.forEach(pr => {
-              console.log(`    #${pr.prNumber} [${pr.status}] ${pr.title} (${pr.branchName})`)
-              console.log(`    Created: ${new Date(pr.createdAt).toLocaleDateString()}`)
-              console.log(`    ${pr.url}`)
-            })
-          })
+        // Display user statistics
+        const userStats = Array.from(userPRs.entries())
+          .sort(([, a], [, b]) => b - a)
+          .map(([username, count]) => `  ${username}: ${count} PR${count > 1 ? 's' : ''}`)
+        console.log(userStats.join('\n'))
       })
 
       const prRepoCountInfo = options.maxRepos && repositories.length > options.maxRepos
