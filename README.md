@@ -6,14 +6,15 @@ It can scan across organizations or top repositories.
 ## How to run
 
 ```bash
-# Basic usage (branches only)
-pnpm --silent start --owner jj-vcs --repo MarceColl/zen-browser-flake
+# Scan given users/repos
+pnpm --silent start --owner jj-vcs # can be supplied multiple times
+pnpm --silent start --repo jj-vcs/jj
 
 # Include pull requests in the search
 pnpm --silent start --owner jj-vcs --include-prs
 
-# Customize pull request search
-pnpm --silent start --owner jj-vcs --include-prs --pr-status open
+# Top repos on GitHub by stars
+pnpm --silent start --top-repos 10 --include-prs
 ```
 
 ## Options
@@ -41,6 +42,7 @@ pnpm --silent start --owner jj-vcs --include-prs --pr-status open
 ## Output Format
 
 The tool outputs:
+
 - Repositories with matching branches, grouped by repository
 - For each repository, branches are counted by username
 - When including PRs with `--include-prs`, repositories with matching pull requests are shown
@@ -66,6 +68,7 @@ Use `--force-refresh` when you want to force a fresh search, ignoring the cache 
 ## Authentication
 
 The tool requires a GitHub token for API access. You can provide it via the GITHUB_TOKEN environment variable.
+If you don't provide a token, the tool will attempt to use the GitHub CLI (`gh`) to authenticate.
 
 ```bash
 GITHUB_TOKEN=$(gh auth token) pnpm --silent start [options]
